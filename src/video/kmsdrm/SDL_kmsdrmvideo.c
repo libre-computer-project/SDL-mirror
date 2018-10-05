@@ -51,6 +51,7 @@ KMSDRM_Available(void)
 
     int drm_fd = open(KMSDRM_DRI_CARD_0, O_RDWR | O_CLOEXEC);
     if (drm_fd >= 0) {
+       SDL_LogDebug(SDL_LOG_CATEGORY_VIDEO, "Opened DRM FD (%d)", drm_fd);
         if (SDL_KMSDRM_LoadSymbols()) {
             drmModeRes *resources = KMSDRM_drmModeGetResources(drm_fd);
             if (resources != NULL) {
@@ -60,7 +61,12 @@ KMSDRM_Available(void)
             SDL_KMSDRM_UnloadSymbols();
         }
         close(drm_fd);
+       SDL_LogDebug(SDL_LOG_CATEGORY_VIDEO, "Closed DRM FD (%d)", drm_fd);
+       drm_fd = -1;
+    } else {
+       SDL_LogDebug(SDL_LOG_CATEGORY_VIDEO, "Could not open DRI_CARD_0");
     }
+
 
     return available;
 }
@@ -566,6 +572,10 @@ KMSDRM_DestroyWindow(_THIS, SDL_Window * window)
     if(data) {
         /* Wait for any pending page flips and unlock buffer */
         KMSDRM_WaitPageFlip(_this, data, -1);
+        if (data->crtc_bo != NULL) {
+            KMSDRM_gbm_surface_release_buffer(data->gs, data->crtc_bo);
+            data->crtc_bo = NULL;
+        }
         if (data->next_bo != NULL) {
             KMSDRM_gbm_surface_release_buffer(data->gs, data->next_bo);
             data->next_bo = NULL;
